@@ -21,6 +21,11 @@
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+mPlane service module
+"""
+
+
 import mplane.model
 import mplane.scheduler
 import pdb
@@ -31,6 +36,10 @@ import datetime
 class PvsrService(mplane.scheduler.Service):
     valid_periods=frozenset([15,30,60,300,600,900,1800,3600])
     def __init__(self, meas, verb,pvsr, default_site,delete_created_measurements,pvsr_default_conf_check_cycle,pvsr_meas_types):
+        """
+        Creating the Capability based on the configuration
+        """
+        
         logging.info("adding capability: {0}".format(meas["name"]))
         
         self._verb=verb
@@ -126,14 +135,23 @@ class PvsrService(mplane.scheduler.Service):
         return res
 
     def _fill_results(self,spec,measurements,period,duration):
+        """
+        Creates the mPlane Result
+        """
         logging.info("Fill measurements for spec {0}".format(spec))
         
         if self._verb==mplane.model.VERB_QUERY:
+            """
+            Query according to the time specified in the specification
+            """
             (first_time,last_time) = spec.when().datetimes()
             first_time=int(first_time.replace(tzinfo=datetime.timezone.utc).timestamp() + period)
             last_time=int(last_time.replace(tzinfo=datetime.timezone.utc).timestamp())
             sleep_time = 0
         else:
+            """
+            Query from NOW
+            """
             first_time = int(time.time())
             if (len(measurements[1])>0 or len(measurements[2])>0) and period<=self._pvsr_default_conf_check_cycle:
                 #there are newly created or modified measurements
@@ -181,6 +199,9 @@ class PvsrService(mplane.scheduler.Service):
 
 
     def _fill_meas_result(self,meas,from_time,to_time,meas_data):
+        """
+        Get measurement result from PVSR via SOAP
+        """
         input=self._pvsr.create_pvsr_object("GetMeasuredValuesInput")
         input.ObjType = "Measurement"
         input.ObjId = meas.Id
@@ -211,6 +232,11 @@ class PvsrService(mplane.scheduler.Service):
                         meas_data[d.T][mplane_name]=None
 
     def _get_equipment(self):
+        """
+        Get the Equipment object from PVSR via SOAP
+        If the equipment does not exists and it is JagaEquipment or SynthTransEquipment
+        then it creates it, otherwise raises and exception
+        """
         eq = self._pvsr.getEquipmentByName(self._meas["equipment"])
         if eq is None:
             site = self._pvsr.getSiteByName(self._default_site)
@@ -245,6 +271,11 @@ class PvsrService(mplane.scheduler.Service):
         return eq
         
     def _add_or_update_measurement(self,eq,meas_type,mplane_param2value,period):
+        """
+        Add or update the measurement in PVSR.
+        Add only works with verb "measure".
+        Update only updates the UDAs if "check_udas": false is not specified
+        """
         meas = self._pvsr.create_pvsr_object("Measurement")
         meas.ParentId = eq.Id
         meas.Type = meas_type
@@ -363,6 +394,9 @@ class PvsrService(mplane.scheduler.Service):
         return (meas,add2)
     
     def _config_measurements(self, spec, period):
+        """
+        Add or update all measurements based on the "types" configuration
+        """
         logging.info("Config measurement for spec {0}".format(spec))
         
         eq = self._get_equipment()
@@ -385,6 +419,9 @@ class PvsrService(mplane.scheduler.Service):
         return measurements
 
     def _delete_measurements(self,measurements):
+        """
+        Deletes measurement if it was created by the application and delete_created_measurements is not false
+        """
         if not self._delete_created_measurements:
             return
         if measurements is None:

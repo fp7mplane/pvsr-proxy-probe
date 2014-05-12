@@ -21,6 +21,11 @@
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+DailyTimedRotatingFileHandler module. Log file name format: <name>.YYYYMMDD.log
+
+"""
+
 import logging
 import datetime
 import os

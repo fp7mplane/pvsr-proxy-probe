@@ -23,6 +23,13 @@
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+Main module for the pvsr-proxy-probe application.
+
+For a detailed description see https://www.ict-mplane.eu/public/performancevisor-plugins
+
+"""
+
 import sys
 import logging
 import logging.config
@@ -41,10 +48,18 @@ import json
 import pdb
 
 def die(msg):
+    """
+    Critical error, the application cannot continue
+    """
     logging.critical(msg)
     exit(1)
 
 def read_config_json():
+    """
+    Reads the configuration file. The default configuration file name
+    is pvsr_proxy_probe.cfg, this can be overwritten with the first command
+    line parameter
+    """
     global config
     
     try:
@@ -63,6 +78,15 @@ def read_config_json():
         die("Configuration file {0} cannot be parsed: {1}".format(config_file_name, e))
     
 def parse_logging_section():
+    """
+    Either use a separate standard logging configuration file
+    or use a simpler mode, directly passing the parameters in the JSON
+    configuration file to the logging.basicConfig call:
+        filename=
+        format=
+        datefmt=
+        level=
+    """
     if "logging" in config:
         if "config_file" in config["logging"]:
             if os.path.isfile(config["logging"]["config_file"]):
@@ -80,6 +104,9 @@ def parse_logging_section():
                 die(e)
 
 def parse_soap_section():
+    """
+    PVSR SOAP connection parameters
+    """
     logging.info("parse_soap_section")
     
     if "soap" not in config:
@@ -111,6 +138,9 @@ def parse_soap_section():
         die(e)
 
 def parse_measurements_section():
+    """
+    measurement parameters
+    """
     logging.info("parse_soap_section")
     
     if "measurements" not in config:
@@ -139,6 +169,15 @@ def parse_measurements_section():
         meas["collector_type"]=None
         meas["name"]=name
         
+        if "verb_measure" not in meas:
+            meas["verb_measure"]=True
+        
+        if "verb_query" not in meas:
+            meas["verb_query"]=True
+            
+        if meas["verb_query"]==False and meas["verb_measure"]==False:
+            die("Neither verb_measure nor verb_query is True in measurements section {0}".format(name))
+        
         for k in meas["types"].keys():
             if "first" not in meas["types"][k] and "second" not in meas["types"][k]:
                 die("Measurement section is missing either first or second, section {0} type {1}".format(name,k))
@@ -152,8 +191,11 @@ def parse_measurements_section():
                 die("Only one collector type is allowed in one measurements section, section {0}".format(name))
             pvsr_meas_types[k] = None
 
-def preload_soap_data():
-    logging.info("preload_soap_data")
+def pvsr_defaults():
+    """
+    Optional default parameters
+    """
+    logging.info("pvsr_defaults")
     
     if "default_site" not in config:
         config["default_site"]="mPlane"
@@ -166,11 +208,14 @@ def preload_soap_data():
     else:
         logging.info("Newly created measurements WILL NOT BE deleted")
     
-    
     if "pvsr_default_conf_check_cycle" not in config:
         config["pvsr_default_conf_check_cycle"]=300
     logging.info("Assuming {0} PVSR configuration check cycle".format(config["pvsr_default_conf_check_cycle"]))
     
+def preload_soap_data():
+    """
+    Loading measurement type configuration from PVSR
+    """
     logging.info("query measurement types")
     try:
         for type in pvsr_meas_types:
@@ -194,6 +239,8 @@ if __name__ == "__main__":
     
     parse_soap_section()
     
+    pvsr_defaults()
+    
     preload_soap_data()
     
     mplane.model.initialize_registry()
@@ -201,28 +248,30 @@ if __name__ == "__main__":
 
     for name in sorted(config["measurements"].keys()):
         meas=config["measurements"][name]
-        scheduler.add_service(
-            pvsr_proxy_service.PvsrService(
-                meas
-                ,mplane.model.VERB_QUERY
-                ,pvsr
-                ,config["default_site"]
-                ,config["delete_created_measurements"]
-                ,config["pvsr_default_conf_check_cycle"]
-                ,pvsr_meas_types
+        if meas["verb_query"]:
+            scheduler.add_service(
+                pvsr_proxy_service.PvsrService(
+                    meas
+                    ,mplane.model.VERB_QUERY
+                    ,pvsr
+                    ,config["default_site"]
+                    ,config["delete_created_measurements"]
+                    ,config["pvsr_default_conf_check_cycle"]
+                    ,pvsr_meas_types
+                )
             )
-        )
-        scheduler.add_service(
-            pvsr_proxy_service.PvsrService(
-                meas
-                ,mplane.model.VERB_MEASURE
-                ,pvsr
-                ,config["default_site"]
-                ,config["delete_created_measurements"]
-                ,config["pvsr_default_conf_check_cycle"]
-                ,pvsr_meas_types
+        if meas["verb_measure"]:
+            scheduler.add_service(
+                pvsr_proxy_service.PvsrService(
+                    meas
+                    ,mplane.model.VERB_MEASURE
+                    ,pvsr
+                    ,config["default_site"]
+                    ,config["delete_created_measurements"]
+                    ,config["pvsr_default_conf_check_cycle"]
+                    ,pvsr_meas_types
+                )
             )
-        )
 
     logging.info("starting service")
 
