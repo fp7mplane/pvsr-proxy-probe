@@ -145,7 +145,7 @@ class PvsrService(mplane.scheduler.Service):
             Query according to the time specified in the specification
             """
             (first_time,last_time) = spec.when().datetimes()
-            first_time=int(first_time.replace(tzinfo=datetime.timezone.utc).timestamp() + period)
+            first_time=int(first_time.replace(tzinfo=datetime.timezone.utc).timestamp())
             last_time=int(last_time.replace(tzinfo=datetime.timezone.utc).timestamp())
             sleep_time = 0
         else:
